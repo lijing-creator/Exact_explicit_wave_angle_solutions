@@ -1,0 +1,8 @@
+# odw_polar.py itself needs only the Python standard library.
+# The dependencies below are for the verification and figure scripts.
+numpy>=1.26
+scipy>=1.11
+sympy>=1.12
+pandas>=2.1
+matplotlib>=3.8
+mpmath>=1.3
