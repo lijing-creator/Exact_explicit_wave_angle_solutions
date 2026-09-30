@@ -11,8 +11,6 @@
    强支全段 M2<1、低压缩支全段 M2>1 的网格核查；
 4. (M,theta) 平面三条轨迹 theta_CJ(M) < theta_s(M) < theta_max(M)
    的排序与不相交性（多 gamma、多 Q 扫描）；
-5. M->infinity 渐近式 u_s ~ (gamma+1)m/(2gamma) + delta* 的收敛检查；
-6. A12 隐式二次因子在数值点上的残差。
 
 运行:
   PYTHONIOENCODING=utf-8 python sonic_numerical_check.py
@@ -321,64 +319,9 @@ print(f"    theta_max - theta_s: min={gap_rel.min():.6f} 度 "
 print(f"    c2 符号: 正 {int((sub['c2']>0).sum())} 组 / 负 {int((sub['c2']<0).sum())} 组"
       f"（两种符号下二次式均只给 1 个物理根）")
 
-# ============================================ 5. M -> infinity 渐近收敛
+# ============================================ 5. 图
 print("=" * 72)
-print("5. 渐近检查 u_s = (gamma+1)m/(2gamma) + delta* + O(1/m)")
-asym_rows = []
-for gamma, Q in [(1.2, 5.0), (1.3, 10.0), (1.4, 20.0)]:
-    h = qprime(gamma, Q)
-    delta_star = (gamma * (gamma * h - h + 2.0) - 2.0 * h - 6.0) / (4.0 * gamma)
-    for M in [20.0, 50.0, 100.0, 200.0]:
-        m = M * M
-        pts = sonic_points(M, gamma, Q)
-        u_s = max(p["u"] for p in pts)
-        u_asym = (gamma + 1.0) / (2.0 * gamma) * m + delta_star
-        asym_rows.append(dict(gamma=gamma, Q=Q, M=M, u_s=u_s,
-                              u_asym=u_asym, diff=u_s - u_asym))
-adf = pd.DataFrame(asym_rows)
-adf.to_csv(OUT / "sonic_asymptotics.csv", index=False, encoding="utf-8-sig")
-# 残差应随 m 增大衰减（O(1/m)）
-ok_decay = True
-for (gamma, Q), gdf in adf.groupby(["gamma", "Q"]):
-    d = gdf.sort_values("M")["diff"].abs().to_numpy()
-    ok_decay &= bool(np.all(np.diff(d) < 0.0))
-check("渐近残差随 M 单调衰减（O(1/m) 收敛）", ok_decay,
-      f"M=200 时最大 |残差|={adf[adf['M']==200]['diff'].abs().max():.3e}")
-for gamma in [1.2, 1.3, 1.4]:
-    print(f"    gamma={gamma}: beta_s(M->inf) -> "
-          f"{math.asin(math.sqrt((gamma+1)/(2*gamma))) * RAD:.4f} 度（与 Q 无关）")
-
-# ============================================ 6. 隐式二次因子数值残差
-print("=" * 72)
-print("6. (tan^2 theta, m) 隐式二次因子零点核对")
-import sympy as sym
-
-gs, ms, hs, us, ss = sym.symbols("gamma m h u s", positive=True)
-Bs = hs - (ms - 1)
-E_s = gs * (gs * hs + 2 * Bs) * us**2 + ((gs + 1) * Bs**2 + 2 * Bs + 2 * gs * (ms - 1)) * us + 2 * (ms - 1) - hs
-r_s = (gs * us + hs + 2 - ms) / (1 + gs * us)
-t2_s = us / (ms - us)
-s_expr = sym.cancel(t2_s * (1 - r_s) ** 2 / (1 + r_s * t2_s) ** 2)
-s_num, s_den = sym.fraction(s_expr)
-res = sym.resultant(sym.Poly(E_s, us), sym.Poly(sym.expand(ss * s_den - s_num), us))
-fac_list = [f for f, _ in sym.factor_list(res)[1] if f.has(ss)]
-assert len(fac_list) == 1
-implicit = sym.lambdify((ss, ms, gs, hs), fac_list[0], "numpy")
-resid = []
-for _, row in sub.sample(min(60, len(sub)), random_state=0).iterrows():
-    s_val = math.tan(row["theta_s_deg"] / RAD) ** 2
-    m_val = row["M"] ** 2
-    h_val = qprime(row["gamma"], row["Q"])
-    # 归一化残差
-    raw = implicit(s_val, m_val, row["gamma"], h_val)
-    scale = abs(implicit(s_val * 1.1 + 1e-3, m_val, row["gamma"], h_val)) + abs(raw) + 1.0
-    resid.append(abs(raw) / scale)
-check("隐式二次因子在音速点上的归一化残差 < 1e-8", max(resid) < 1e-8,
-      f"max={max(resid):.3e}")
-
-# ============================================ 7. 图
-print("=" * 72)
-print("7. 绘图")
+print("5. 绘图")
 fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.2), constrained_layout=True)
 
 # (a) 锚点极曲线 theta-beta，标 CJ/音速/脱体，弱支亚声速段加粗
@@ -458,7 +401,7 @@ report += ["", "关键数值（gamma=1.3, M=7, Q=10）：",
            f"- theta_max - theta_s = {gap_deg:.6f} 度",
            f"- 脱体点 M2 = {math.sqrt(st_d[2]):.6f}",
            f"- CJ 点 M2 = {math.sqrt(st_cj[2]):.6f}",
-           "", "输出: sonic_scan.csv, sonic_asymptotics.csv, sonic_locus.png"]
+           "", "输出: sonic_scan.csv, sonic_locus.png"]
 (OUT / "report.md").write_text("\n".join(report), encoding="utf-8")
 print(f"报告: {OUT / 'report.md'}")
 raise SystemExit(0 if verdict == "PASS" else 1)

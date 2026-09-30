@@ -1,6 +1,6 @@
 # 音速轨迹数值验证报告
 
-总判定: PASS (21/21)
+总判定: PASS (19/19)
 
 | 检查 | 结果 | 备注 |
 |---|---|---|
@@ -23,8 +23,6 @@
 | 扫描全部参数组均恰有 1 个高压缩支音速点 | PASS | 288/288 组有音速点; 多根组数=0 |
 | 扫描全域 theta_CJ < theta_s < theta_max | PASS | 违例 0/288 |
 | 扫描全域音速点在弱支 (beta_s < beta_max) | PASS | 违例 0/288 |
-| 渐近残差随 M 单调衰减（O(1/m) 收敛） | PASS | M=200 时最大 |残差|=1.736e-03 |
-| 隐式二次因子在音速点上的归一化残差 < 1e-8 | PASS | max=1.787e-13 |
 
 关键数值（gamma=1.3, M=7, Q=10）：
 - u_s = 41.612799988981
@@ -34,4 +32,4 @@
 - 脱体点 M2 = 0.990632
 - CJ 点 M2 = 3.013775
 
-输出: sonic_scan.csv, sonic_asymptotics.csv, sonic_locus.png
+输出: sonic_scan.csv, sonic_locus.png

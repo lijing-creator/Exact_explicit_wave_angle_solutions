@@ -3,8 +3,8 @@
 
 Reference implementation of the explicit formulae derived in
 
-    J. Li and C. Luo, "Exact explicit wave-angle solutions of the equilibrium
-    oblique-detonation polar".
+    J. Li and C. Luo, "Exact explicit wave-angle solutions for equilibrium
+    oblique detonations".
 
 Model: calorically perfect gas, constant specific-heat ratio ``gamma``,
 instantaneous and complete heat release, planar zero-thickness equilibrium
@@ -23,6 +23,10 @@ total-sonic point from a quadratic.  No iteration is used anywhere.
 
 Angles are in radians throughout; use ``math.degrees`` at the call site.
 
+The two-gamma model, with separate specific-heat ratios ``gamma1`` upstream
+and ``gamma2`` downstream, reduces exactly to the single-gamma model with
+effective parameters; see ``two_gamma_parameters`` and ``two_gamma_polar``.
+
 The routines are the ones exercised by ``verification/validate_closed_form.py``
 and ``verification/sonic_numerical_check.py``; see the README for how those
 checks are run and what tolerances they meet.
@@ -40,6 +44,8 @@ __all__ = [
     "DetachmentPoint",
     "SonicPoint",
     "real_cubic_roots",
+    "two_gamma_parameters",
+    "two_gamma_polar",
 ]
 
 # Root-clustering and admissibility-filter tolerances.  These are the values
@@ -481,6 +487,68 @@ class PolarModel:
 
     def __repr__(self) -> str:
         return f"PolarModel(M={self.M!r}, gamma={self.gamma!r}, Q={self.Q!r})"
+
+
+# ---------------------------------------------------------------------------
+# Two-gamma model
+# ---------------------------------------------------------------------------
+
+def two_gamma_parameters(
+    M: float, gamma1: float, gamma2: float, Q: float
+) -> tuple[float, float, float]:
+    """Effective single-gamma parameters ``(gamma_e, M_e, Q_e)`` of the two-gamma model.
+
+    The two-gamma model uses ``gamma1`` upstream and ``gamma2`` downstream,
+    with ``M = U1 / sqrt(gamma1 p1 / rho1)`` and ``Q = Q* / (R1 T1)``.  Moving
+    the difference of the two enthalpy coefficients into the heat release
+    turns it into the single-gamma jump problem with
+
+        gamma_e = gamma2,
+        M_e     = M sqrt(gamma1 / gamma2),
+        Q_e     = Q + gamma1 / (gamma1 - 1) - gamma2 / (gamma2 - 1),
+
+    equation (4.9) of the paper.  The mapping is exact: pressures, densities
+    and velocities, hence ``r``, ``theta`` and ``beta``, are unchanged.
+
+    >>> g, Me, Qe = two_gamma_parameters(8.0, 1.4, 1.2, 20.0)
+    >>> g, round(Me, 6), round(Qe, 6)
+    (1.2, 8.640988, 17.5)
+    """
+    if gamma1 <= 1.0 or gamma2 <= 1.0:
+        raise ValueError(f"gamma1 and gamma2 must exceed 1, got {gamma1!r}, {gamma2!r}")
+    M_e = M * math.sqrt(gamma1 / gamma2)
+    Q_e = Q + gamma1 / (gamma1 - 1.0) - gamma2 / (gamma2 - 1.0)
+    return gamma2, M_e, Q_e
+
+
+def two_gamma_polar(M: float, gamma1: float, gamma2: float, Q: float) -> PolarModel:
+    """Polar of the two-gamma model, evaluated through its exact single-gamma equivalent.
+
+    Every angle returned by the resulting ``PolarModel`` -- wave angles,
+    ``theta_max``, ``theta_CJ``, the sonic point -- applies to the two-gamma
+    model directly, and so does the downstream Mach number, because the
+    downstream state and ``gamma2`` are both preserved.  Mach numbers that
+    refer to the upstream sound speed are effective ones: ``polar.M`` is
+    ``M_e`` and ``polar.cj.M_cj`` is the effective CJ Mach number.  Convert
+    them back with ``M = M_e * sqrt(gamma2 / gamma1)``.
+
+    The branch classification of the paper needs ``Q_e >= 0``; a two-gamma
+    model with ``Q_e < 0`` has no CJ point and is rejected.
+
+    >>> import math
+    >>> polar = two_gamma_polar(8.0, 1.4, 1.2, 20.0)
+    >>> round(math.degrees(polar.detachment().theta_max), 6)
+    47.316588
+    >>> round(polar.cj.M_cj * math.sqrt(1.2 / 1.4), 6)  # actual CJ Mach number
+    3.55756
+    """
+    gamma_e, M_e, Q_e = two_gamma_parameters(M, gamma1, gamma2, Q)
+    if Q_e < 0.0:
+        raise ValueError(
+            f"Q_e = {Q_e:.12g} < 0: the equivalent single-gamma problem has no "
+            "CJ point, so the branch classification does not apply"
+        )
+    return PolarModel(M_e, gamma_e, Q_e)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 # odw_polar.py itself needs only the Python standard library.
-# The dependencies below are for the verification and figure scripts.
+# equilibrium_odw needs numpy; the rest is for the verification and figure scripts.
 numpy>=1.26
 scipy>=1.11
 sympy>=1.12
